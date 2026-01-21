@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>かんしゃにっき😊</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (JSX Converter) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* カスタムフォントとアニメーション */
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-orange-50 text-gray-800">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const { useState, useEffect, useRef } = React;
+
+        // --- Icon Components (SVG Replacements for Lucide) ---
+        const IconBase = ({ children, size = 24, className = "", ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
+        );
+        const ChevronLeft = (props) => <IconBase {...props}><path d="m15 18-6-6 6-6"/></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><path d="m9 18 6-6-6-6"/></IconBase>;
+        const BookHeart = (props) => <IconBase {...props}><path d="M16 6l-1.9 2-2.1-2a2.8 2.8 0 1 0-4 4l6 6.3 6-6.3a2.8 2.8 0 0 0-4-4z"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></IconBase>;
+        const ArrowLeft = (props) => <IconBase {...props}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></IconBase>;
+        const Clock = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconBase>;
+        const Loader2 = (props) => <IconBase {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></IconBase>;
+        const Settings = (props) => <IconBase {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconBase>;
+        const Download = (props) => <IconBase {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></IconBase>;
+        const Upload = (props) => <IconBase {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconBase>;
+        const FileText = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></IconBase>;
+
+
+        // --- Firebase Initialization ---
+        // 注意: ローカルで動かす場合は、ここに自身のFirebase Configを設定する必要があります
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            // Placeholder config (for demo purposes if env vars are missing)
+            apiKey: "AIzaSyDummyKey",
+            authDomain: "dummy.firebaseapp.com",
+            projectId: "dummy-project"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gratitude-diary-default';
+
+        const App = () => {
+          // 画面遷移の状態: 'title', 'calendar', 'input', 'settings'
+          const [screen, setScreen] = useState('title');
+          const [user, setUser] = useState(null);
+          const [loading, setLoading] = useState(true);
+          
+          // データ管理
+          const [gratitudeData, setGratitudeData] = useState({});
+
+          // 選択中の日付
+          const [selectedDate, setSelectedDate] = useState(new Date());
+          // カレンダー表示月
+          const [currentMonth, setCurrentMonth] = useState(new Date());
+
+          // 1. 認証処理
+          useEffect(() => {
+            const initAuth = async () => {
+              try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                  await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                  await signInAnonymously(auth);
+                }
+              } catch (error) {
+                console.error("Auth error:", error);
+                setLoading(false); // エラー時もロード画面を解除して操作可能にする（データ保存はできないが）
+              }
+            };
+            initAuth();
+
+            const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+              setUser(currentUser);
+              if (!currentUser) setLoading(false);
+            });
+            return () => unsubscribe();
+          }, []);
+
+          // 2. データ同期 (Firestore)
+          useEffect(() => {
+            if (!user) return;
+
+            // ユーザーごとのドキュメントパス
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'gratitude');
+
+            const unsubscribe = onSnapshot(docRef, (docSnap) => {
+              if (docSnap.exists()) {
+                setGratitudeData(docSnap.data());
+              } else {
+                setGratitudeData({});
+              }
+              setLoading(false);
+            }, (error) => {
+              console.error("Data sync error:", error);
+              setLoading(false);
+            });
+
+            return () => unsubscribe();
+          }, [user]);
+
+          // Firestoreへの保存ヘルパー
+          const saveToFirestore = async (newData) => {
+            if (!user) return;
+            try {
+              const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'gratitude');
+              await setDoc(docRef, newData, { merge: true });
+            } catch (error) {
+              console.error("Save error:", error);
+              alert("保存に失敗しました。通信環境を確認してください。");
+            }
+          };
+
+          // 全データを上書き保存するヘルパー（復元用）
+          const overwriteFirestore = async (fullData) => {
+            if (!user) return;
+            try {
+              const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'gratitude');
+              await setDoc(docRef, fullData); 
+            } catch (error) {
+              console.error("Restore error:", error);
+              alert("復元データの保存に失敗しました。");
+            }
+          };
+
+          // 日付フォーマットヘルパー (YYYY-MM-DD)
+          const formatDate = (date) => {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          };
+
+          // 画面遷移ハンドラ
+          const goToCalendar = () => setScreen('calendar');
+          const goToInput = (date) => {
+            setSelectedDate(date);
+            setScreen('input');
+          };
+          const goToTitle = () => setScreen('title');
+          const goToSettings = () => setScreen('settings');
+
+          if (loading) {
+            return (
+              <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+                <Loader2 className="animate-spin text-orange-500" size={48} />
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-orange-50 font-sans text-gray-800 flex justify-center">
+              <div className="w-full max-w-md bg-white min-h-screen shadow-xl relative flex flex-col">
+                
+                {screen === 'title' && (
+                  <TitleScreen onStart={goToCalendar} />
+                )}
+
+                {screen === 'calendar' && (
+                  <CalendarScreen 
+                    currentMonth={currentMonth}
+                    setCurrentMonth={setCurrentMonth}
+                    gratitudeData={gratitudeData}
+                    onSelectDate={goToInput}
+                    onBack={goToTitle}
+                    onSettings={goToSettings}
+                  />
+                )}
+
+                {screen === 'input' && (
+                  <InputScreen 
+                    date={selectedDate}
+                    gratitudeData={gratitudeData}
+                    saveToFirestore={saveToFirestore}
+                    formatDate={formatDate}
+                    onBack={goToCalendar}
+                  />
+                )}
+
+                {screen === 'settings' && (
+                  <SettingsScreen 
+                    gratitudeData={gratitudeData}
+                    overwriteFirestore={overwriteFirestore}
+                    onBack={goToCalendar}
+                  />
+                )}
+
+              </div>
+            </div>
+          );
+        };
+
+        // ① タイトル画面
+        const TitleScreen = ({ onStart }) => {
+          return (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-orange-100 to-white text-center">
+              <div className="mb-8 animate-bounce">
+                <BookHeart size={80} className="text-pink-500 mx-auto" />
+              </div>
+              <h1 className="text-4xl font-bold text-orange-600 mb-2 tracking-widest">かんしゃにっき😊</h1>
+              <p className="text-gray-500 mb-12">1日30個、幸せを見つけよう</p>
+              
+              <button 
+                onClick={onStart}
+                className="bg-orange-400 hover:bg-orange-500 text-white font-bold py-4 px-8 rounded-full shadow-lg transform transition active:scale-95 text-xl flex items-center gap-2"
+              >
+                <span className="text-2xl">✍️</span> 感謝の言葉を書く
+              </button>
+            </div>
+          );
+        };
+
+        // ② カレンダー画面
+        const CalendarScreen = ({ currentMonth, setCurrentMonth, gratitudeData, onSelectDate, onBack, onSettings }) => {
+          const year = currentMonth.getFullYear();
+          const month = currentMonth.getMonth();
+          const today = new Date();
+
+          // スワイプ検出用
+          const [touchStart, setTouchStart] = useState(null);
+          const [touchEnd, setTouchEnd] = useState(null);
+          const minSwipeDistance = 50;
+
+          const onTouchStart = (e) => {
+            setTouchEnd(null);
+            setTouchStart(e.targetTouches[0].clientX);
+          };
+          const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+          const onTouchEnd = () => {
+            if (!touchStart || !touchEnd) return;
+            const distance = touchStart - touchEnd;
+            if (distance > minSwipeDistance) nextMonth();
+            if (distance < -minSwipeDistance) prevMonth();
+          };
+
+          const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+          const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+
+          const generateCalendarDays = () => {
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const days = [];
+            for (let i = 0; i < firstDay.getDay(); i++) days.push(null);
+            for (let i = 1; i <= lastDay.getDate(); i++) days.push(new Date(year, month, i));
+            return days;
+          };
+
+          const days = generateCalendarDays();
+          const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+          const getDayStyle = (count, isToday) => {
+            let classes = "h-14 w-full flex flex-col items-center justify-center rounded-lg text-sm font-bold transition relative cursor-pointer border ";
+            
+            if (count === 0) classes += "text-gray-400 hover:bg-gray-50 ";
+            else if (count <= 10) classes += "bg-gray-50 text-gray-500 "; 
+            else if (count <= 20) classes += "bg-red-50 text-red-500 "; 
+            else if (count <= 29) classes += "bg-yellow-50 text-yellow-600 "; 
+            else if (count === 30) classes += "bg-blue-500 text-white shadow-md transform scale-105 z-10 ";
+            else if (count <= 99) classes += "bg-yellow-300 text-blue-600 ";
+            else if (count >= 100) classes += "bg-green-600 text-yellow-300 shadow-lg animate-pulse ";
+            
+            if (isToday) {
+              classes += "border-2 border-blue-500 z-20";
+            } else {
+              if (count === 0) classes += "border-gray-100";
+              else if (count <= 10) classes += "border-gray-200";
+              else if (count <= 20) classes += "border-red-100";
+              else if (count <= 29) classes += "border-yellow-100";
+              else if (count === 30) classes += "border-yellow-400";
+              else if (count <= 99) classes += "border-yellow-400";
+              else if (count >= 100) classes += "border-2 border-red-500";
+            }
+            return classes;
+          };
+
+          const formatDateKey = (date) => {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          };
+
+          return (
+            <div 
+              className="flex-1 flex flex-col bg-white"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+            >
+              <header className="bg-orange-400 text-white p-4 flex justify-between items-center shadow-md select-none">
+                <button onClick={onBack} className="p-1 hover:bg-orange-500 rounded"><ArrowLeft /></button>
+                <h2 className="text-xl font-bold">{year}年 {month + 1}月</h2>
+                <button onClick={onSettings} className="p-1 hover:bg-orange-500 rounded"><Settings /></button>
+              </header>
+
+              <div className="h-6"></div>
+
+              <div className="grid grid-cols-7 gap-1 px-2 mb-2 text-center text-xs font-bold text-gray-500 select-none">
+                {weekDays.map((d, i) => (
+                  <div key={i} className={i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : ""}>{d}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-2 px-2 pb-8">
+                {days.map((date, idx) => {
+                  if (!date) return <div key={idx} className="h-14"></div>;
+                  
+                  const dateKey = formatDateKey(date);
+                  const entries = gratitudeData[dateKey] || [];
+                  const count = entries.length;
+                  const isToday = date.getDate() === today.getDate() && 
+                                  date.getMonth() === today.getMonth() && 
+                                  date.getFullYear() === today.getFullYear();
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className={getDayStyle(count, isToday)}
+                      onClick={() => onSelectDate(date)}
+                    >
+                      <span className="absolute top-1 left-1 text-[10px] opacity-70">{date.getDate()}</span>
+                      {count > 0 && <span className="text-lg mt-1">{count}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        };
+
+        // ③ 入力モード
+        const InputScreen = ({ date, gratitudeData, saveToFirestore, formatDate, onBack }) => {
+          const dateKey = formatDate(date);
+          const currentEntries = gratitudeData[dateKey] || [];
+          const [inputText, setInputText] = useState('');
+          const scrollRef = useRef(null);
+
+          const getCurrentTime = () => {
+            const now = new Date();
+            return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          };
+
+          const handleAdd = async (e) => {
+            e.preventDefault();
+            if (!inputText.trim()) return;
+            if (currentEntries.length >= 100) {
+                alert("すごい！100個達成です！");
+                return;
+            }
+            const newEntry = { text: inputText, time: getCurrentTime() };
+            const newEntries = [...currentEntries, newEntry];
+            await saveToFirestore({ [dateKey]: newEntries });
+            setInputText('');
+            setTimeout(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+          };
+
+          const isMaxReached = currentEntries.length >= 100;
+
+          return (
+            <div className="flex-1 flex flex-col bg-slate-50 h-screen">
+              <header className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+                <div className="flex items-center gap-2">
+                    <span className="text-2xl">📅</span>
+                    <div>
+                        <h2 className="font-bold text-lg leading-tight">{date.getMonth() + 1}月{date.getDate()}日の感謝</h2>
+                        <p className="text-xs text-gray-500">現在: {currentEntries.length}個 / 目標: 30個</p>
+                    </div>
+                </div>
+                <div className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full font-bold text-sm">
+                    あと {Math.max(0, 30 - currentEntries.length)}
+                </div>
+              </header>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {currentEntries.length === 0 && (
+                  <div className="text-center py-10 text-gray-400">
+                    <p>まだ記録がありません。<br/>今日の「ありがとう」を見つけましょう！</p>
+                  </div>
+                )}
+
+                {currentEntries.map((entry, index) => {
+                  const text = typeof entry === 'string' ? entry : entry.text;
+                  const time = typeof entry === 'object' ? entry.time : null;
+                  return (
+                    <div key={index} className="flex gap-3 items-start animate-fade-in-up">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center font-bold text-sm mt-1">
+                        {index + 1}
+                      </div>
+                      <div className="bg-white p-3 rounded-r-xl rounded-bl-xl shadow-sm text-gray-700 break-words max-w-[85%] relative group">
+                        <div>{text}</div>
+                        {time && (
+                          <div className="text-[10px] text-gray-400 text-right mt-1 flex items-center justify-end gap-1">
+                            <Clock size={10} />
+                            {time}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={scrollRef}></div>
+              </div>
+
+              <div className="bg-white p-4 border-t sticky bottom-0 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                {!isMaxReached ? (
+                  <form onSubmit={handleAdd} className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between mb-1">
+                        <label className="text-sm font-bold text-gray-600">
+                            {currentEntries.length + 1}個目の感謝
+                        </label>
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          placeholder="例：天気が良くて気持ちよかった"
+                          className="flex-1 border-2 border-orange-200 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-400 text-lg"
+                          autoFocus
+                        />
+                        <button type="submit" disabled={!inputText.trim()} className="bg-orange-500 disabled:bg-gray-300 text-white font-bold px-6 rounded-lg shadow-md active:scale-95 transition whitespace-nowrap">感謝</button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="text-center p-4 bg-green-100 text-green-700 rounded-lg font-bold">🎉 100個達成！素晴らしい1日です！ 🎉</div>
+                )}
+                <button onClick={onBack} className="w-full mt-4 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition border border-gray-200">カレンダーモードに戻る</button>
+              </div>
+            </div>
+          );
+        };
+
+        // ④ 設定画面
+        const SettingsScreen = ({ gratitudeData, overwriteFirestore, onBack }) => {
+          const fileInputRef = useRef(null);
+
+          // CSVエクスポート
+          const handleExport = () => {
+            // ヘッダー: 日付, 時間, 内容
+            let csvContent = "\uFEFFDate,Time,Text\n";
+            
+            // データ変換
+            Object.keys(gratitudeData).sort().forEach(date => {
+              const entries = gratitudeData[date];
+              entries.forEach(entry => {
+                const text = typeof entry === 'string' ? entry : entry.text;
+                const time = (typeof entry === 'object' && entry.time) ? entry.time : '';
+                // エスケープ処理: ダブルクォートがあれば2つ重ねる。全体をダブルクォートで囲む
+                const escapedText = `"${text.replace(/"/g, '""')}"`;
+                csvContent += `${date},${time},${escapedText}\n`;
+              });
+            });
+
+            // Blob作成とダウンロード
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `gratitude_backup_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          };
+
+          // CSVインポート
+          const handleImportClick = () => {
+            fileInputRef.current?.click();
+          };
+
+          const handleFileChange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const text = event.target.result;
+                const lines = text.split(/\r\n|\n/);
+                
+                // 既存データをコピー
+                const newData = { ...gratitudeData };
+                let count = 0;
+
+                // CSVパース (簡易実装)
+                for (let i = 1; i < lines.length; i++) {
+                  const line = lines[i];
+                  if (!line.trim()) continue;
+
+                  // CSVパースロジック
+                  const parseCSVLine = (str) => {
+                    const arr = [];
+                    let quote = false;
+                    let col = '';
+                    for (let c of str) {
+                      if (c === '"') { quote = !quote; continue; }
+                      if (c === ',' && !quote) { arr.push(col); col = ''; continue; }
+                      col += c;
+                    }
+                    arr.push(col);
+                    return arr;
+                  };
+
+                  const cols = parseCSVLine(line);
+                  if (cols.length < 3) continue;
+
+                  const date = cols[0].trim();
+                  const time = cols[1].trim();
+                  let content = cols[2]; // テキスト
+
+                  if (!date || !content) continue;
+
+                  // データ構築
+                  if (!newData[date]) newData[date] = [];
+                  
+                  // 重複チェック
+                  const exists = newData[date].some(e => {
+                    const eText = typeof e === 'string' ? e : e.text;
+                    const eTime = (typeof e === 'object' && e.time) ? e.time : '';
+                    return eText === content && eTime === time;
+                  });
+
+                  if (!exists) {
+                    newData[date].push({ text: content, time: time });
+                    count++;
+                  }
+                }
+
+                if (count > 0) {
+                  if (confirm(`${count}件のデータを復元・追加しますか？\n（既存のデータは保持されます）`)) {
+                    overwriteFirestore(newData);
+                    alert("復元が完了しました！");
+                  }
+                } else {
+                    alert("新しいデータは見つかりませんでした（重複しているか、形式が正しくありません）。");
+                }
+
+              } catch (err) {
+                console.error(err);
+                alert("ファイルの読み込みに失敗しました。CSV形式を確認してください。");
+              }
+              // ファイル入力をリセット
+              e.target.value = '';
+            };
+            reader.readAsText(file);
+          };
+
+          return (
+            <div className="flex-1 flex flex-col bg-slate-50 h-screen">
+              <header className="bg-white border-b p-4 flex items-center shadow-sm sticky top-0">
+                <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full mr-2">
+                    <ArrowLeft className="text-gray-600" />
+                </button>
+                <h2 className="text-xl font-bold text-gray-800">設定・データ管理</h2>
+              </header>
+
+              <div className="p-6 space-y-6">
+                
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="flex items-center gap-3 mb-4 text-orange-600">
+                        <FileText size={28} />
+                        <h3 className="text-lg font-bold">バックアップ (エクスポート)</h3>
+                    </div>
+                    <p className="text-gray-600 mb-6 text-sm">
+                        これまでの感謝の記録を、CSVファイルとして端末に保存します。<br/>
+                        定期的に保存することをおすすめします。
+                    </p>
+                    <button 
+                        onClick={handleExport}
+                        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 shadow-md transition active:scale-95"
+                    >
+                        <Download size={20} />
+                        CSVファイルで保存する
+                    </button>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="flex items-center gap-3 mb-4 text-blue-600">
+                        <Upload size={28} />
+                        <h3 className="text-lg font-bold">復元 (インポート)</h3>
+                    </div>
+                    <p className="text-gray-600 mb-6 text-sm">
+                        保存したCSVファイルを読み込んで、データを復元します。<br/>
+                        ※現在のデータに、ファイルの内容が<strong>追加</strong>されます。
+                    </p>
+                    <button 
+                        onClick={handleImportClick}
+                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 shadow-md transition active:scale-95"
+                    >
+                        <Upload size={20} />
+                        CSVファイルから復元する
+                    </button>
+                    <input 
+                        type="file" 
+                        accept=".csv"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden"
+                    />
+                </div>
+
+                <div className="text-xs text-gray-400 text-center mt-8">
+                    <p>データ形式: 日付, 時間, 感謝の言葉</p>
+                    <p>例: 2024-01-01, 10:00, "素晴らしい天気"</p>
+                </div>
+
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
