@@ -32,10 +32,21 @@
         body {
             font-family: 'M PLUS Rounded 1c', sans-serif;
             -webkit-tap-highlight-color: transparent;
-            user-select: none; /* 長押し時のテキスト選択を防ぐ */
+            
+            /* iOSでのテキスト選択・長押しメニューを無効化 */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+
             /* iOSでのセーフエリア対応（ノッチなど） */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* 重要: 入力フォームは選択・入力を許可する */
+        input, textarea {
+            -webkit-user-select: text !important;
+            user-select: text !important;
         }
 
         @keyframes fade-in-up {
