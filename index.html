@@ -27,6 +27,7 @@
             -webkit-touch-callout: none;
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
+            background-color: #fff7ed;
         }
 
         input, textarea {
@@ -65,11 +66,11 @@
         }
     </style>
 </head>
-<body class="bg-orange-50 text-gray-800 min-h-screen">
+<body class="text-gray-800 min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
         // --- Icon Components ---
         const IconBase = ({ children, size = 24, className = "", ...props }) => (
@@ -89,6 +90,7 @@
         const X = (props) => <IconBase {...props}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></IconBase>;
         const ZoomIn = (props) => <IconBase {...props}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></IconBase>;
         const ImagePlus = (props) => <IconBase {...props}><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><line x1="16" x2="22" y1="5" y2="5"/><line x1="19" x2="19" y1="2" y2="8"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconBase>;
+        const ImageIcon = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconBase>;
 
         // 画像圧縮ヘルパー
         const compressImage = (file) => {
@@ -128,9 +130,25 @@
             });
         };
 
+        // 背景画像コンポーネント（1枚大きく表示）
+        const BackgroundWallpaper = ({ image }) => {
+            if (!image) return null;
+
+            return (
+                <div className="fixed inset-0 pointer-events-none z-0">
+                    <img 
+                        src={image} 
+                        className="w-full h-full object-cover opacity-60" 
+                        alt="Background" 
+                    />
+                </div>
+            );
+        };
+
         const App = () => {
           const [screen, setScreen] = useState('title');
           
+          // メインデータ
           const [gratitudeData, setGratitudeData] = useState(() => {
             try {
               const saved = localStorage.getItem('gratitudeData');
@@ -139,6 +157,16 @@
               console.error("Data load error", e);
               return {};
             }
+          });
+
+          // 設定データ (背景画像など)
+          const [settings, setSettings] = useState(() => {
+              try {
+                  const saved = localStorage.getItem('appSettings');
+                  return saved ? JSON.parse(saved) : { backgroundImage: null };
+              } catch (e) {
+                  return { backgroundImage: null };
+              }
           });
 
           const [selectedDate, setSelectedDate] = useState(new Date());
@@ -151,6 +179,10 @@
                 alert("容量がいっぱいで保存できませんでした。古い写真を削除してください。");
             }
           }, [gratitudeData]);
+
+          useEffect(() => {
+              localStorage.setItem('appSettings', JSON.stringify(settings));
+          }, [settings]);
 
           const updateData = (newData) => {
              setGratitudeData(newData);
@@ -168,9 +200,16 @@
           const goToTitle = () => setScreen('title');
           const goToSettings = () => setScreen('settings');
 
+          // 背景があるときは、メインの背景を透明度高めにする
+          const mainBgClass = settings.backgroundImage ? 'bg-white/60' : 'bg-white';
+
           return (
-            <div className="min-h-screen bg-orange-50 font-sans text-gray-800 flex justify-center">
-              <div className="w-full max-w-md bg-white min-h-screen shadow-xl relative flex flex-col">
+            <div className="min-h-screen bg-orange-50 font-sans text-gray-800 flex justify-center relative">
+              
+              {/* 背景エフェクト */}
+              <BackgroundWallpaper image={settings.backgroundImage} />
+
+              <div className={`w-full max-w-md min-h-screen shadow-xl relative flex flex-col z-10 backdrop-blur-sm transition-colors duration-500 ${mainBgClass}`}>
                 
                 {screen === 'title' && (
                   <TitleScreen onStart={goToCalendar} />
@@ -184,6 +223,7 @@
                     onSelectDate={goToInput}
                     onBack={goToTitle}
                     onSettings={goToSettings}
+                    hasBackground={!!settings.backgroundImage}
                   />
                 )}
 
@@ -194,6 +234,7 @@
                     setGratitudeData={updateData} 
                     formatDate={formatDate}
                     onBack={goToCalendar}
+                    hasBackground={!!settings.backgroundImage}
                   />
                 )}
 
@@ -201,6 +242,8 @@
                   <SettingsScreen 
                     gratitudeData={gratitudeData}
                     setGratitudeData={updateData}
+                    settings={settings}
+                    setSettings={setSettings}
                     onBack={goToCalendar}
                   />
                 )}
@@ -212,12 +255,12 @@
 
         const TitleScreen = ({ onStart }) => {
           return (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-orange-100 to-white text-center">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-transparent text-center">
               <div className="mb-8 animate-bounce">
-                <BookHeart size={80} className="text-pink-500 mx-auto" />
+                <BookHeart size={80} className="text-pink-500 mx-auto drop-shadow-lg" />
               </div>
-              <h1 className="text-4xl font-bold text-orange-600 mb-2 tracking-widest">かんしゃにっき😊</h1>
-              <p className="text-gray-500 mb-12">1日30個、幸せを見つけよう</p>
+              <h1 className="text-4xl font-bold text-orange-600 mb-2 tracking-widest drop-shadow-sm">かんしゃにっき😊</h1>
+              <p className="text-gray-500 mb-12 font-bold drop-shadow-sm">1日30個、幸せを見つけよう</p>
               
               <button 
                 onClick={onStart}
@@ -229,7 +272,7 @@
           );
         };
 
-        const CalendarScreen = ({ currentMonth, setCurrentMonth, gratitudeData, onSelectDate, onBack, onSettings }) => {
+        const CalendarScreen = ({ currentMonth, setCurrentMonth, gratitudeData, onSelectDate, onBack, onSettings, hasBackground }) => {
           const year = currentMonth.getFullYear();
           const month = currentMonth.getMonth();
           const today = new Date();
@@ -270,10 +313,14 @@
 
           const getDayStyle = (count, isToday) => {
             let classes = "h-14 w-full flex flex-col items-center justify-center rounded-lg text-sm font-bold transition relative cursor-pointer border ";
-            if (count === 0) classes += "text-gray-400 hover:bg-gray-50 ";
-            else if (count <= 10) classes += "bg-gray-50 text-gray-500 "; 
-            else if (count <= 20) classes += "bg-red-50 text-red-500 "; 
-            else if (count <= 29) classes += "bg-yellow-50 text-yellow-600 "; 
+            
+            // 背景があるときは、セルの背景を少し濃くして視認性を上げる
+            const bgOpacity = hasBackground ? '95' : '100';
+            
+            if (count === 0) classes += `text-gray-400 hover:bg-gray-50/${bgOpacity} bg-white/${hasBackground ? '40' : '0'} `;
+            else if (count <= 10) classes += `bg-gray-50/${bgOpacity} text-gray-500 `; 
+            else if (count <= 20) classes += `bg-red-50/${bgOpacity} text-red-500 `; 
+            else if (count <= 29) classes += `bg-yellow-50/${bgOpacity} text-yellow-600 `; 
             else if (count === 30) classes += "bg-blue-500 text-white shadow-md transform scale-105 z-10 ";
             else if (count <= 99) classes += "bg-yellow-300 text-blue-600 ";
             else if (count >= 100) classes += "bg-green-600 text-yellow-300 shadow-lg animate-pulse ";
@@ -297,7 +344,7 @@
 
           return (
             <div 
-              className="flex-1 flex flex-col bg-white"
+              className="flex-1 flex flex-col bg-transparent"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
@@ -312,7 +359,7 @@
 
               <div className="grid grid-cols-7 gap-1 px-2 mb-2 text-center text-xs font-bold text-gray-500 select-none">
                 {weekDays.map((d, i) => (
-                  <div key={i} className={i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : ""}>{d}</div>
+                  <div key={i} className={i === 0 ? "text-red-400 font-bold" : i === 6 ? "text-blue-400 font-bold" : "font-bold"}>{d}</div>
                 ))}
               </div>
 
@@ -346,26 +393,21 @@
           );
         };
 
-        const InputScreen = ({ date, gratitudeData, setGratitudeData, formatDate, onBack }) => {
+        const InputScreen = ({ date, gratitudeData, setGratitudeData, formatDate, onBack, hasBackground }) => {
           const dateKey = formatDate(date);
           const currentEntries = gratitudeData[dateKey] || [];
           const [inputText, setInputText] = useState('');
           const scrollRef = useRef(null);
           
-          // 写真添付用の状態
           const [attachedImage, setAttachedImage] = useState(null);
-          const [targetIndexForImage, setTargetIndexForImage] = useState(null); // 更新対象のインデックス
+          const [targetIndexForImage, setTargetIndexForImage] = useState(null);
           const fileInputRef = useRef(null);
 
-          // 削除関連の状態
           const [deleteTarget, setDeleteTarget] = useState(null); 
           const [pressingIndex, setPressingIndex] = useState(null);
           const pressTimer = useRef(null);
 
-          // 画像拡大モーダル用
           const [zoomedImage, setZoomedImage] = useState(null);
-
-          // パーティクルエフェクト
           const [particles, setParticles] = useState([]);
           const animationFrameRef = useRef();
 
@@ -428,7 +470,6 @@
             return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
           };
 
-          // 画像選択ハンドラ
           const handleImageSelect = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -436,10 +477,8 @@
                 const resizedDataUrl = await compressImage(file);
                 
                 if (targetIndexForImage !== null) {
-                    // 既存のエントリーを更新
                     const newEntries = [...currentEntries];
                     const oldEntry = newEntries[targetIndexForImage];
-                    // 互換性のためオブジェクト化
                     const entryObj = typeof oldEntry === 'string' 
                         ? { text: oldEntry, time: getCurrentTime() } 
                         : { ...oldEntry };
@@ -451,16 +490,15 @@
                         ...gratitudeData,
                         [dateKey]: newEntries
                     });
-                    setTargetIndexForImage(null); // リセット
+                    setTargetIndexForImage(null);
                 } else {
-                    // 新規投稿用
                     setAttachedImage(resizedDataUrl);
                 }
             } catch (err) {
                 console.error("Image processing error", err);
                 alert("画像の読み込みに失敗しました");
             }
-            e.target.value = ''; // Reset input
+            e.target.value = '';
           };
 
           const handleAdd = (e) => {
@@ -494,7 +532,7 @@
             });
 
             setInputText('');
-            setAttachedImage(null); // 画像リセット
+            setAttachedImage(null);
             setTimeout(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
           };
           
@@ -527,7 +565,7 @@
           const isMaxReached = currentEntries.length >= 100;
 
           return (
-            <div className="flex-1 flex flex-col bg-slate-50 h-screen relative overflow-hidden">
+            <div className="flex-1 flex flex-col h-screen relative overflow-hidden bg-transparent">
               {particles.map(p => (
                 <div 
                   key={p.id}
@@ -579,10 +617,10 @@
                         onMouseLeave={cancelPress}
                         style={{ cursor: 'pointer' }}
                     >
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 select-none">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center font-bold text-sm mt-1 select-none shadow-sm border border-orange-100 bg-white">
                         {index + 1}
                       </div>
-                      <div className="bg-white p-3 rounded-r-xl rounded-bl-xl shadow-sm text-gray-700 break-words max-w-[85%] relative group select-none w-full">
+                      <div className="bg-white p-3 rounded-r-xl rounded-bl-xl shadow-sm text-gray-700 break-words max-w-[85%] relative group select-none w-full border border-gray-100">
                         {image && (
                             <div className="mb-2 relative">
                                 <img 
@@ -598,7 +636,6 @@
                         )}
                         <div>{text}</div>
                         <div className="flex justify-between items-end mt-1">
-                             {/* 後から写真追加ボタン */}
                              <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -677,7 +714,7 @@
                 ) : (
                   <div className="text-center p-4 bg-green-100 text-green-700 rounded-lg font-bold">🎉 100個達成！素晴らしい1日です！ 🎉</div>
                 )}
-                <button onClick={onBack} className="w-full mt-2 py-2 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition">カレンダーに戻る🐾</button>
+                <button onClick={onBack} className="w-full mt-2 py-2 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition">カレンダーに戻る</button>
               </div>
               
               {/* 削除確認モーダル */}
@@ -714,8 +751,9 @@
           );
         };
 
-        const SettingsScreen = ({ gratitudeData, setGratitudeData, onBack }) => {
+        const SettingsScreen = ({ gratitudeData, setGratitudeData, settings, setSettings, onBack }) => {
           const fileInputRef = useRef(null);
+          const bgInputRef = useRef(null);
 
           const handleExport = () => {
             let csvContent = "\uFEFFDate,Time,Text,ImageAttached\n";
@@ -814,9 +852,26 @@
             reader.readAsText(file);
           };
 
+          const handleBgChange = async (e) => {
+              const file = e.target.files[0];
+              if(!file) return;
+              try {
+                  const dataUrl = await compressImage(file);
+                  setSettings({ ...settings, backgroundImage: dataUrl });
+                  alert("背景画像を設定しました！");
+              } catch(e) {
+                  alert("画像の設定に失敗しました");
+              }
+          };
+
+          const clearBg = () => {
+              setSettings({ ...settings, backgroundImage: null });
+              alert("背景画像をリセットしました");
+          };
+
           return (
-            <div className="flex-1 flex flex-col bg-slate-50 h-screen">
-              <header className="bg-white border-b p-4 flex items-center shadow-sm sticky top-0">
+            <div className="flex-1 flex flex-col bg-slate-50 h-screen overflow-y-auto">
+              <header className="bg-white border-b p-4 flex items-center shadow-sm sticky top-0 z-20">
                 <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full mr-2">
                     <ArrowLeft className="text-gray-600" />
                 </button>
@@ -824,6 +879,43 @@
               </header>
 
               <div className="p-6 space-y-6">
+                
+                {/* 背景設定 */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="flex items-center gap-3 mb-4 text-pink-500">
+                        <ImageIcon size={28} />
+                        <h3 className="text-lg font-bold">カレンダーの背景</h3>
+                    </div>
+                    <p className="text-gray-600 mb-6 text-sm">
+                        お気に入りの画像をカレンダーの背景に設定できます。<br/>
+                        スマートフォンの壁紙のように、1枚の画像が大きく表示されます。
+                    </p>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => bgInputRef.current?.click()}
+                            className="flex-1 bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 shadow-md transition active:scale-95"
+                        >
+                            <ImageIcon size={20} />
+                            画像を設定
+                        </button>
+                        {settings.backgroundImage && (
+                            <button 
+                                onClick={clearBg}
+                                className="bg-gray-200 text-gray-600 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <Trash2 size={20} />
+                            </button>
+                        )}
+                    </div>
+                    <input 
+                        type="file" 
+                        accept="image/*"
+                        ref={bgInputRef}
+                        onChange={handleBgChange}
+                        className="hidden"
+                    />
+                </div>
+
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex items-center gap-3 mb-4 text-orange-600">
                         <FileText size={28} />
