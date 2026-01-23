@@ -616,6 +616,11 @@
                 return;
             }
 
+            // キーボードを閉じる
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+
             let startX = window.innerWidth / 2;
             let startY = window.innerHeight - 80;
             if (e.nativeEvent && (e.nativeEvent.clientX || (e.nativeEvent.touches && e.nativeEvent.touches[0]))) {
