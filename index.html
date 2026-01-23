@@ -415,16 +415,55 @@
             setParticles(prevParticles => {
               if (prevParticles.length === 0) return [];
               return prevParticles
-                .map(p => ({
-                  ...p,
-                  x: p.x + p.vx,
-                  y: p.y + p.vy,
-                  vy: p.vy + 0.8,
-                  vx: p.vx * 0.98,
-                  life: p.life - 1,
-                  rotation: p.rotation + p.vr,
-                  opacity: p.life < 20 ? p.life / 20 : 1
-                }))
+                .map(p => {
+                  // スペシャルメッセージの挙動制御
+                  if (p.isSpecial) {
+                      let nextP = { ...p };
+                      
+                      if (p.phase === 'popup') {
+                          // 目標位置に向かってイージング（Lerp）
+                          nextP.x += (nextP.targetX - nextP.x) * 0.1;
+                          nextP.y += (nextP.targetY - nextP.y) * 0.1;
+                          
+                          // 目標に近づいたらホールドモードへ
+                          if (Math.abs(nextP.targetY - nextP.y) < 2) {
+                              nextP.phase = 'hold';
+                          }
+                      } else if (p.phase === 'hold') {
+                          nextP.holdTimer -= 1;
+                          // ぷるぷるさせる
+                          nextP.scale = 1 + Math.sin(Date.now() / 100) * 0.1; 
+                          
+                          if (nextP.holdTimer <= 0) {
+                              nextP.phase = 'fall';
+                              // 散るための初速
+                              nextP.vx = (Math.random() - 0.5) * 10;
+                              nextP.vy = -5; 
+                          }
+                      } else {
+                          // 落下
+                          nextP.x += nextP.vx;
+                          nextP.y += nextP.vy;
+                          nextP.vy += 0.8; 
+                          nextP.rotation += nextP.vr;
+                          nextP.life -= 1;
+                          nextP.opacity = nextP.life < 20 ? nextP.life / 20 : 1;
+                      }
+                      return nextP;
+                  } else {
+                      // 通常パーティクル
+                      return {
+                        ...p,
+                        x: p.x + p.vx,
+                        y: p.y + p.vy,
+                        vy: p.vy + 0.8,
+                        vx: p.vx * 0.98,
+                        life: p.life - 1,
+                        rotation: p.rotation + p.vr,
+                        opacity: p.life < 20 ? p.life / 20 : 1
+                      };
+                  }
+                })
                 .filter(p => p.life > 0);
             });
             animationFrameRef.current = requestAnimationFrame(updateParticles);
@@ -437,11 +476,13 @@
             return () => cancelAnimationFrame(animationFrameRef.current);
           }, [particles.length, updateParticles]);
 
-          const triggerExplosion = (startX, startY) => {
+          // エフェクト発火
+          const triggerExplosion = (startX, startY, count) => {
             const newParticles = [];
             const chars = ['☆', '★', '感謝', '✨', '😊', '🎉', '❤️'];
             const colors = ['#FFD700', '#FFA500', '#FF69B4', '#00BFFF', '#32CD32', '#FF4500'];
 
+            // 基本のパーティクル
             for (let i = 0; i < 40; i++) {
               const angle = Math.random() * Math.PI * 2;
               const speed = Math.random() * 15 + 5;
@@ -462,6 +503,72 @@
                 opacity: 1
               });
             }
+
+            // スペシャルメッセージの追加判定
+            // 30回目（目標達成！）
+            if (count === 30) {
+                newParticles.push({
+                    id: Math.random(),
+                    x: startX, 
+                    y: startY,
+                    targetX: window.innerWidth / 2, // 画面中央へ
+                    targetY: window.innerHeight / 3, // 少し上の方が見やすい
+                    vx: 0, vy: 0, vr: 0,
+                    life: 200, 
+                    holdTimer: 120, // 2秒キープ
+                    phase: 'popup',
+                    isSpecial: true,
+                    char: 'おめでとう！30回目達成！！',
+                    color: '#FF0000', // 赤色で強調
+                    rotation: 0,
+                    scale: 1,
+                    fontSize: 28, 
+                    opacity: 1
+                });
+                
+                // 紙吹雪追加
+                for(let i=0; i<30; i++) {
+                     const angle = Math.random() * Math.PI * 2;
+                     const speed = Math.random() * 20 + 5;
+                     newParticles.push({
+                        id: Math.random(),
+                        x: window.innerWidth / 2,
+                        y: window.innerHeight / 3,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed - 5,
+                        vr: (Math.random() - 0.5) * 50,
+                        life: 120 + Math.random() * 50,
+                        char: '🎉',
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        rotation: Math.random() * 360,
+                        scale: 1.5,
+                        fontSize: 24,
+                        opacity: 1
+                     });
+                }
+            } 
+            // 10回目, 20回目... (30以外で10の倍数)
+            else if (count % 10 === 0) {
+                newParticles.push({
+                    id: Math.random(),
+                    x: startX,
+                    y: startY,
+                    targetX: window.innerWidth / 2,
+                    targetY: window.innerHeight / 2, // 画面中央
+                    vx: 0, vy: 0, vr: 0,
+                    life: 150,
+                    holdTimer: 90, // 1.5秒キープ
+                    phase: 'popup',
+                    isSpecial: true,
+                    char: `${count}回目！`,
+                    color: '#FF8C00', // ダークオレンジ
+                    rotation: 0,
+                    scale: 1,
+                    fontSize: 32,
+                    opacity: 1
+                });
+            }
+
             setParticles(prev => [...prev, ...newParticles]);
           };
 
@@ -517,7 +624,10 @@
                  startX = clientX;
                  startY = clientY;
             }
-            triggerExplosion(startX, startY);
+            
+            // 今回の投稿数（現在の数 + 1）
+            const nextCount = currentEntries.length + 1;
+            triggerExplosion(startX, startY, nextCount);
 
             const newEntry = { 
                 text: inputText, 
@@ -574,7 +684,8 @@
                     transform: `translate(-50%, -50%) rotate(${p.rotation}deg) scale(${p.scale})`,
                     color: p.color, fontSize: `${p.fontSize}px`, fontWeight: 'bold',
                     opacity: p.opacity, pointerEvents: 'none', zIndex: 100,
-                    textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    textShadow: '0 2px 4px rgba(255,255,255,0.8), 0 0 10px rgba(255,255,255,0.5)', // 視認性を上げるために白い光彩をつける
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   {p.char}
