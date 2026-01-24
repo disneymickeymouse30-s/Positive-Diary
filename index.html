@@ -28,6 +28,16 @@
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
             background-color: #fff7ed;
+            /* 画面全体のバウンススクロールを防ぐ */
+            overscroll-behavior: none;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #root {
+            height: 100%;
+            width: 100%;
         }
 
         input, textarea {
@@ -64,9 +74,16 @@
         .animate-slide-in-left {
             animation: slide-in-left 0.3s ease-out forwards;
         }
+        
+        /* 背景アニメーション: ふわふわ浮遊 */
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(10deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
     </style>
 </head>
-<body class="text-gray-800 min-h-screen">
+<body class="text-gray-800">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
@@ -203,13 +220,14 @@
           // 背景があるときは、メインの背景を透明度高めにする
           const mainBgClass = settings.backgroundImage ? 'bg-white/60' : 'bg-white';
 
+          // 画面全体のレイアウト: h-full, w-fullで固定し、overflow-hiddenで全体スクロールを防ぐ
           return (
-            <div className="min-h-screen bg-orange-50 font-sans text-gray-800 flex justify-center relative">
+            <div className="h-full w-full bg-orange-50 font-sans text-gray-800 flex justify-center relative overflow-hidden">
               
               {/* 背景エフェクト */}
               <BackgroundWallpaper image={settings.backgroundImage} />
 
-              <div className={`w-full max-w-md min-h-screen shadow-xl relative flex flex-col z-10 backdrop-blur-sm transition-colors duration-500 ${mainBgClass}`}>
+              <div className={`w-full max-w-md h-full shadow-xl relative flex flex-col z-10 backdrop-blur-sm transition-colors duration-500 ${mainBgClass}`}>
                 
                 {screen === 'title' && (
                   <TitleScreen onStart={goToCalendar} />
@@ -255,7 +273,7 @@
 
         const TitleScreen = ({ onStart }) => {
           return (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-transparent text-center">
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-transparent text-center overflow-y-auto">
               <div className="mb-8 animate-bounce">
                 <BookHeart size={80} className="text-pink-500 mx-auto drop-shadow-lg" />
               </div>
@@ -344,7 +362,7 @@
 
           return (
             <div 
-              className="flex-1 flex flex-col bg-transparent"
+              className="flex-1 flex flex-col bg-transparent touch-pan-y"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
@@ -363,9 +381,10 @@
                 ))}
               </div>
 
+              {/* カレンダーグリッドはoverflow-y-autoでスクロール可能にしておく（画面が小さい場合に対応） */}
               <div 
                   key={currentMonth.toISOString()}
-                  className={`grid grid-cols-7 gap-2 px-2 pb-8 ${slideDirection === 'left' ? 'animate-slide-in-right' : slideDirection === 'right' ? 'animate-slide-in-left' : ''}`}
+                  className={`grid grid-cols-7 gap-2 px-2 pb-8 overflow-y-auto ${slideDirection === 'left' ? 'animate-slide-in-right' : slideDirection === 'right' ? 'animate-slide-in-left' : ''}`}
               >
                 {days.map((date, idx) => {
                   if (!date) return <div key={idx} className="h-14"></div>;
@@ -830,7 +849,7 @@
                 ) : (
                   <div className="text-center p-4 bg-green-100 text-green-700 rounded-lg font-bold">🎉 100個達成！素晴らしい1日です！ 🎉</div>
                 )}
-                <button onClick={onBack} className="w-full mt-2 py-2 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition">カレンダーに戻る</button>
+                <button onClick={onBack} className="w-full mt-2 py-2 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition">カレンダーに戻る🐾</button>
               </div>
               
               {/* 削除確認モーダル */}
